@@ -5,6 +5,7 @@
 package org.citra.citra_emu.features.settings.model.view
 
 import androidx.annotation.DrawableRes
+import org.citra.citra_emu.activities.EmulationActivity
 
 class RunnableSetting(
     titleId: Int,
@@ -12,7 +13,11 @@ class RunnableSetting(
     val isRuntimeRunnable: Boolean,
     @DrawableRes val iconId: Int = 0,
     val runnable: () -> Unit,
-    val value: (() -> String)? = null
+    val value: (() -> String)? = null,
+    val onLongClick: (() -> Boolean)? = null
 ) : SettingsItem(null, titleId, descriptionId) {
     override val type = TYPE_RUNNABLE
+
+    override val isEditable: Boolean
+        get() = if (EmulationActivity.isRunning()) isRuntimeRunnable else true
 }

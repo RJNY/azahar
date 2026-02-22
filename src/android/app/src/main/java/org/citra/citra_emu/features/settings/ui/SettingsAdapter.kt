@@ -586,26 +586,43 @@ class SettingsAdapter(
         ).show((fragmentView as SettingsFragment).childFragmentManager, MessageDialogFragment.TAG)
     }
 
+    fun onClickAutoMap() {
+        showConfirmationDialog(R.string.controller_auto_map, R.string.controller_auto_map_confirm) {
+            InputBindingSetting.clearAllBindings()
+            InputBindingSetting.applyDefaultBindings()
+            fragmentView.loadSettingsList()
+            fragmentView.onSettingChanged()
+        }
+    }
+
+    fun onLongClickAutoMap(): Boolean {
+        showConfirmationDialog(R.string.controller_clear_all, R.string.controller_clear_all_confirm) {
+            InputBindingSetting.clearAllBindings()
+            fragmentView.loadSettingsList()
+            fragmentView.onSettingChanged()
+        }
+        return true
+    }
+
     fun onClickRegenerateConsoleId() {
-        MaterialAlertDialogBuilder(context)
-            .setTitle(R.string.regenerate_console_id)
-            .setMessage(R.string.regenerate_console_id_description)
-            .setPositiveButton(android.R.string.ok) { _: DialogInterface, _: Int ->
-                SystemSaveGame.regenerateConsoleId()
-                notifyDataSetChanged()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        showConfirmationDialog(R.string.regenerate_console_id, R.string.regenerate_console_id_description) {
+            SystemSaveGame.regenerateConsoleId()
+            notifyDataSetChanged()
+        }
     }
 
     fun onClickRegenerateMAC() {
+        showConfirmationDialog(R.string.regenerate_mac_address, R.string.regenerate_mac_address_description) {
+            SystemSaveGame.regenerateMac()
+            notifyDataSetChanged()
+        }
+    }
+
+    private fun showConfirmationDialog(titleId: Int, messageId: Int, onConfirm: () -> Unit) {
         MaterialAlertDialogBuilder(context)
-            .setTitle(R.string.regenerate_mac_address)
-            .setMessage(R.string.regenerate_mac_address_description)
-            .setPositiveButton(android.R.string.ok) { _: DialogInterface, _: Int ->
-                SystemSaveGame.regenerateMac()
-                notifyDataSetChanged()
-            }
+            .setTitle(titleId)
+            .setMessage(messageId)
+            .setPositiveButton(android.R.string.ok) { _: DialogInterface, _: Int -> onConfirm() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
