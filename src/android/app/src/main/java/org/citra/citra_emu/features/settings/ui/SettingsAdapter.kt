@@ -62,6 +62,7 @@ import org.citra.citra_emu.features.settings.ui.viewholder.SliderViewHolder
 import org.citra.citra_emu.features.settings.ui.viewholder.StringInputViewHolder
 import org.citra.citra_emu.features.settings.ui.viewholder.SubmenuViewHolder
 import org.citra.citra_emu.features.settings.ui.viewholder.SwitchSettingViewHolder
+import org.citra.citra_emu.features.settings.utils.AndroidControlsIniHandler
 import org.citra.citra_emu.fragments.MessageDialogFragment
 import org.citra.citra_emu.fragments.MotionBottomSheetDialogFragment
 import org.citra.citra_emu.utils.SystemSaveGame
@@ -584,6 +585,20 @@ class SettingsAdapter(
             titleId,
             messageId
         ).show((fragmentView as SettingsFragment).childFragmentManager, MessageDialogFragment.TAG)
+    }
+
+    fun onClickAutoMap() {
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.controller_auto_map)
+            .setMessage(R.string.controller_auto_map_confirm)
+            .setPositiveButton(android.R.string.ok) { _: DialogInterface, _: Int ->
+                AndroidControlsIniHandler.clearAllBindings()
+                AndroidControlsIniHandler.applyDefaultBindings()
+                fragmentView.loadSettingsList()
+                fragmentView.onSettingChanged()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     fun onClickRegenerateConsoleId() {

@@ -7,7 +7,6 @@ package org.citra.citra_emu.activities
 import android.Manifest.permission
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -26,8 +25,6 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.fragment.NavHostFragment
-import androidx.preference.PreferenceManager
-import org.citra.citra_emu.CitraApplication
 import org.citra.citra_emu.NativeLibrary
 import org.citra.citra_emu.R
 import org.citra.citra_emu.camera.StillImageCameraHelper.OnFilePickerResult
@@ -39,7 +36,7 @@ import org.citra.citra_emu.features.hotkeys.HotkeyUtility
 import org.citra.citra_emu.features.settings.model.BooleanSetting
 import org.citra.citra_emu.features.settings.model.IntSetting
 import org.citra.citra_emu.features.settings.model.SettingsViewModel
-import org.citra.citra_emu.features.settings.model.view.InputBindingSetting
+import org.citra.citra_emu.features.settings.utils.AndroidControlsIniHandler
 import org.citra.citra_emu.fragments.EmulationFragment
 import org.citra.citra_emu.fragments.MessageDialogFragment
 import org.citra.citra_emu.model.Game
@@ -53,8 +50,6 @@ import org.citra.citra_emu.utils.ThemeUtil
 import org.citra.citra_emu.viewmodel.EmulationViewModel
 
 class EmulationActivity : AppCompatActivity() {
-    private val preferences: SharedPreferences
-        get() = PreferenceManager.getDefaultSharedPreferences(CitraApplication.appContext)
     var isActivityRecreated = false
     private val emulationViewModel: EmulationViewModel by viewModels()
     val settingsViewModel: SettingsViewModel by viewModels()
@@ -88,6 +83,8 @@ class EmulationActivity : AppCompatActivity() {
 
         ThemeUtil.setTheme(this)
         settingsViewModel.settings.loadSettings()
+        AndroidControlsIniHandler.migrateFromSharedPreferencesIfNeeded()
+        AndroidControlsIniHandler.loadFromIni()
         super.onCreate(savedInstanceState)
         secondaryDisplay = SecondaryDisplay(this)
         secondaryDisplay.updateDisplay()
@@ -267,8 +264,8 @@ class EmulationActivity : AppCompatActivity() {
             return super.dispatchKeyEvent(event)
         }
 
-        val button =
-            preferences.getInt(InputBindingSetting.getInputButtonKey(event.keyCode), event.keyCode)
+        val hostCode = if (event.keyCode == 0) event.scanCode else event.keyCode
+        val button = AndroidControlsIniHandler.getButtonMapping(hostCode)
         val action: Int = when (event.action) {
             KeyEvent.ACTION_DOWN -> {
                 hotkeyUtility.handleHotkey(button)
@@ -338,15 +335,10 @@ class EmulationActivity : AppCompatActivity() {
             val axis = range.axis
             val origValue = event.getAxisValue(axis)
             var value = ControllerMappingHelper.scaleAxis(input, axis, origValue)
-            val nextMapping =
-                preferences.getInt(InputBindingSetting.getInputAxisButtonKey(axis), -1)
-            val guestOrientation =
-                preferences.getInt(InputBindingSetting.getInputAxisOrientationKey(axis), -1)
-            val inverted = preferences.getBoolean(InputBindingSetting.getInputAxisInvertedKey(axis),false);
-            if (nextMapping == -1 || guestOrientation == -1) {
-                // Axis is unmapped
-                continue
-            }
+            val mapping = AndroidControlsIniHandler.getAxisMapping(axis) ?: continue
+            val nextMapping = mapping.guestButton
+            val guestOrientation = mapping.orientation
+            val inverted = mapping.inverted
             if (value > 0f && value < 0.1f || value < 0f && value > -0.1f) {
                 // Skip joystick wobble
                 value = 0f

@@ -41,6 +41,7 @@ import org.citra.citra_emu.features.settings.model.view.StringInputSetting
 import org.citra.citra_emu.features.settings.model.view.StringSingleChoiceSetting
 import org.citra.citra_emu.features.settings.model.view.SubmenuSetting
 import org.citra.citra_emu.features.settings.model.view.SwitchSetting
+import org.citra.citra_emu.features.settings.utils.AndroidControlsIniHandler
 import org.citra.citra_emu.features.settings.utils.SettingsFile
 import org.citra.citra_emu.fragments.ResetSettingsDialogFragment
 import org.citra.citra_emu.utils.BirthdayMonth
@@ -775,7 +776,17 @@ class SettingsFragmentPresenter(private val fragmentView: SettingsFragmentView) 
 
     private fun addControlsSettings(sl: ArrayList<SettingsItem>) {
         settingsActivity.setToolbarTitle(settingsActivity.getString(R.string.preferences_controls))
+        AndroidControlsIniHandler.reloadFromIni()
         sl.apply {
+            add(
+                RunnableSetting(
+                    R.string.controller_auto_map,
+                    R.string.controller_auto_map_description,
+                    true,
+                    R.drawable.ic_controller,
+                    { settingsAdapter.onClickAutoMap() }
+                )
+            )
             add(HeaderSetting(R.string.generic_buttons))
             Settings.buttonKeys.forEachIndexed { i: Int, key: String ->
                 val button = getInputObject(key)
@@ -832,16 +843,12 @@ class SettingsFragmentPresenter(private val fragmentView: SettingsFragmentView) 
     private fun getInputObject(key: String): AbstractStringSetting {
         return object : AbstractStringSetting {
             override var string: String
-                get() = preferences.getString(key, "")!!
-                set(value) {
-                    preferences.edit()
-                        .putString(key, value)
-                        .apply()
-                }
+                get() = AndroidControlsIniHandler.getDisplayString(key)
+                set(_) { } // No-op: display strings are derived from in-memory maps, not persisted
             override val key = key
             override val section = Settings.SECTION_CONTROLS
             override val isRuntimeEditable = true
-            override val valueAsString = preferences.getString(key, "")!!
+            override val valueAsString get() = AndroidControlsIniHandler.getDisplayString(key)
             override val defaultValue = ""
         }
     }
