@@ -40,6 +40,7 @@ import org.citra.citra_emu.features.settings.model.BooleanSetting
 import org.citra.citra_emu.features.settings.model.IntSetting
 import org.citra.citra_emu.features.settings.model.SettingsViewModel
 import org.citra.citra_emu.features.settings.model.view.InputBindingSetting
+import org.citra.citra_emu.features.settings.utils.AndroidControlsIniHandler
 import org.citra.citra_emu.fragments.EmulationFragment
 import org.citra.citra_emu.fragments.MessageDialogFragment
 import org.citra.citra_emu.model.Game
@@ -88,6 +89,7 @@ class EmulationActivity : AppCompatActivity() {
 
         ThemeUtil.setTheme(this)
         settingsViewModel.settings.loadSettings()
+        AndroidControlsIniHandler.loadBindingsFromIniIfNeeded()
         super.onCreate(savedInstanceState)
         secondaryDisplay = SecondaryDisplay(this)
         secondaryDisplay.updateDisplay()
@@ -140,6 +142,7 @@ class EmulationActivity : AppCompatActivity() {
     // onWindowFocusChanged to prevent the unwanted status bar state.
     override fun onResume() {
         super.onResume()
+        AndroidControlsIniHandler.syncBindingsFromIni()
         enableFullscreenImmersive()
         applyOrientationSettings() // Check for orientation settings changes on runtime
     }

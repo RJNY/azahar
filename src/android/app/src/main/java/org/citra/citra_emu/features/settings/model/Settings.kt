@@ -113,6 +113,7 @@ class Settings {
         const val SECTION_CUSTOM_PORTRAIT = "Custom Portrait Layout"
         const val SECTION_PERFORMANCE_OVERLAY = "Performance Overlay"
         const val SECTION_STORAGE = "Storage"
+        const val SECTION_ANDROID_CONTROLS = "AndroidControls"
 
         const val KEY_BUTTON_A = "button_a"
         const val KEY_BUTTON_B = "button_b"
@@ -241,7 +242,8 @@ class Settings {
                     SECTION_STORAGE,
                     SECTION_UTILITY,
                     SECTION_AUDIO,
-                    SECTION_DEBUG
+                    SECTION_DEBUG,
+                    SECTION_ANDROID_CONTROLS
                 )
         }
     }

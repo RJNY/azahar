@@ -18,6 +18,7 @@ import org.citra.citra_emu.features.hotkeys.Hotkey
 import org.citra.citra_emu.features.settings.model.AbstractSetting
 import org.citra.citra_emu.features.settings.model.AbstractStringSetting
 import org.citra.citra_emu.features.settings.model.Settings
+import org.citra.citra_emu.features.settings.utils.AndroidControlsIniHandler
 
 class InputBindingSetting(
     val abstractSetting: AbstractSetting,
@@ -111,50 +112,14 @@ class InputBindingSetting(
      * Returns the Citra button code for the settings key.
      */
     private val buttonCode: Int
-        get() =
-            when (abstractSetting.key) {
-                Settings.KEY_BUTTON_A -> NativeLibrary.ButtonType.BUTTON_A
-                Settings.KEY_BUTTON_B -> NativeLibrary.ButtonType.BUTTON_B
-                Settings.KEY_BUTTON_X -> NativeLibrary.ButtonType.BUTTON_X
-                Settings.KEY_BUTTON_Y -> NativeLibrary.ButtonType.BUTTON_Y
-                Settings.KEY_BUTTON_L -> NativeLibrary.ButtonType.TRIGGER_L
-                Settings.KEY_BUTTON_R -> NativeLibrary.ButtonType.TRIGGER_R
-                Settings.KEY_BUTTON_ZL -> NativeLibrary.ButtonType.BUTTON_ZL
-                Settings.KEY_BUTTON_ZR -> NativeLibrary.ButtonType.BUTTON_ZR
-                Settings.KEY_BUTTON_SELECT -> NativeLibrary.ButtonType.BUTTON_SELECT
-                Settings.KEY_BUTTON_START -> NativeLibrary.ButtonType.BUTTON_START
-                Settings.KEY_BUTTON_HOME -> NativeLibrary.ButtonType.BUTTON_HOME
-                Settings.KEY_BUTTON_UP -> NativeLibrary.ButtonType.DPAD_UP
-                Settings.KEY_BUTTON_DOWN -> NativeLibrary.ButtonType.DPAD_DOWN
-                Settings.KEY_BUTTON_LEFT -> NativeLibrary.ButtonType.DPAD_LEFT
-                Settings.KEY_BUTTON_RIGHT -> NativeLibrary.ButtonType.DPAD_RIGHT
-                Settings.HOTKEY_SCREEN_SWAP -> Hotkey.SWAP_SCREEN.button
-                Settings.HOTKEY_CYCLE_LAYOUT -> Hotkey.CYCLE_LAYOUT.button
-                Settings.HOTKEY_CLOSE_GAME -> Hotkey.CLOSE_GAME.button
-                Settings.HOTKEY_PAUSE_OR_RESUME -> Hotkey.PAUSE_OR_RESUME.button
-                Settings.HOTKEY_QUICKSAVE -> Hotkey.QUICKSAVE.button
-                Settings.HOTKEY_QUICKlOAD -> Hotkey.QUICKLOAD.button
-                Settings.HOTKEY_TURBO_LIMIT -> Hotkey.TURBO_LIMIT.button
-                else -> -1
-            }
+        get() = abstractSetting.key?.let { settingKeyToButtonCode(it) } ?: -1
 
     /**
      * Returns the key used to lookup the reverse mapping for this key, which is used to cleanup old
      * settings on re-mapping or clearing of a setting.
      */
     private val reverseKey: String
-        get() {
-            var reverseKey = "${INPUT_MAPPING_PREFIX}_ReverseMapping_${abstractSetting.key}"
-            if (isAxisMappingSupported() && !isTrigger()) {
-                // Triggers are the only axis-supported mappings without orientation
-                reverseKey += "_" + if (isHorizontalOrientation()) {
-                    0
-                } else {
-                    1
-                }
-            }
-            return reverseKey
-        }
+        get() = buildReverseKey(abstractSetting.key ?: "")
 
     /**
      * Removes the old mapping for this key from the settings, e.g. on user clearing the setting.
@@ -167,11 +132,14 @@ class InputBindingSetting(
             preferences.edit()
                 .remove(abstractSetting.key) // Used for ui text
                 .remove(oldKey) // Used for button mapping
-                .remove(oldKey + "_GuestOrientation") // Used for axis orientation
-                .remove(oldKey + "_GuestButton") // Used for axis button
-                .remove(oldKey + "_Inverted") // used for axis inversion
+                .remove(oldKey + SUFFIX_GUEST_ORIENTATION) // Used for axis orientation
+                .remove(oldKey + SUFFIX_GUEST_BUTTON) // Used for axis button
+                .remove(oldKey + SUFFIX_INVERTED) // used for axis inversion
                 .apply()
         }
+
+        val settingKey = abstractSetting.key ?: return
+        AndroidControlsIniHandler.removeMapping(settingKey)
     }
 
     /**
@@ -229,9 +197,13 @@ class InputBindingSetting(
         }
 
         val code = translateEventToKeyId(keyEvent)
-        writeButtonMapping(getInputButtonKey(code))
-        val uiString = "${keyEvent.device.name}: Button $code"
+        val inputKey = getInputButtonKey(code)
+        writeButtonMapping(inputKey)
+        val uiString = "Button $code"
         value = uiString
+
+        val settingKey = abstractSetting.key ?: return
+        AndroidControlsIniHandler.writeButtonMapping(settingKey, code)
     }
 
     /**
@@ -258,14 +230,23 @@ class InputBindingSetting(
         // use UP (-) to map vertical, but use RIGHT (+) to map horizontal
         val inverted = if (isHorizontalOrientation()) axisDir == '-' else axisDir == '+'
         writeAxisMapping(motionRange.axis, button, inverted)
-        val uiString = "${device.name}: Axis ${motionRange.axis}" + axisDir
+        val uiString = "Axis ${motionRange.axis}$axisDir"
         value = uiString
+
+        val settingKey = abstractSetting.key ?: return
+        val orientation = if (isHorizontalOrientation()) 0 else 1
+        AndroidControlsIniHandler.writeAxisMapping(
+            settingKey, motionRange.axis, button, orientation, inverted
+        )
     }
 
     override val type = TYPE_INPUT_BINDING
 
     companion object {
         private const val INPUT_MAPPING_PREFIX = "InputMapping"
+        const val SUFFIX_GUEST_ORIENTATION = "_GuestOrientation"
+        const val SUFFIX_GUEST_BUTTON = "_GuestButton"
+        const val SUFFIX_INVERTED = "_Inverted"
 
         /**
          * Returns the settings key for the specified Citra button code.
@@ -311,18 +292,18 @@ class InputBindingSetting(
         /**
          * Helper function to get the settings key for an gamepad axis button (stick or trigger).
          */
-        fun getInputAxisButtonKey(axis: Int): String = "${getInputAxisKey(axis)}_GuestButton"
+        fun getInputAxisButtonKey(axis: Int): String = "${getInputAxisKey(axis)}$SUFFIX_GUEST_BUTTON"
 
         /**
          * Helper function to get the settings key for an whether a gamepad axis is inverted.
          */
-        fun getInputAxisInvertedKey(axis: Int): String = "${getInputAxisKey(axis)}_Inverted"
+        fun getInputAxisInvertedKey(axis: Int): String = "${getInputAxisKey(axis)}$SUFFIX_INVERTED"
 
         /**
          * Helper function to get the settings key for an gamepad axis orientation.
          */
         fun getInputAxisOrientationKey(axis: Int): String =
-            "${getInputAxisKey(axis)}_GuestOrientation"
+            "${getInputAxisKey(axis)}$SUFFIX_GUEST_ORIENTATION"
 
 
         /**
@@ -334,12 +315,52 @@ class InputBindingSetting(
          * This handles keys like the media-keys on google statia-controllers
          * that don't have a conventional "mapping" and report as "unknown"
          */
-        fun translateEventToKeyId(event: KeyEvent): Int {
-            return if (event.keyCode == 0) {
-                event.scanCode
-            } else {
-                event.keyCode
+        fun translateEventToKeyId(event: KeyEvent): Int =
+            if (event.keyCode == 0) event.scanCode else event.keyCode
+
+        /**
+         * Builds the SharedPreferences key used for reverse-mapping lookup and cleanup.
+         */
+        fun buildReverseKey(settingKey: String): String {
+            val hasOrientation = settingKey in Settings.circlePadKeys ||
+                settingKey in Settings.cStickKeys ||
+                settingKey in Settings.dPadAxisKeys
+            var key = "${INPUT_MAPPING_PREFIX}_ReverseMapping_$settingKey"
+            if (hasOrientation) {
+                val orientation = if (settingKey.contains("horizontal", ignoreCase = true)) 0 else 1
+                key += "_$orientation"
             }
+            return key
+        }
+
+        /**
+         * Maps a settings key (e.g. [Settings.KEY_BUTTON_A]) to its native button code,
+         * or null if the key is not a recognized button/hotkey binding.
+         */
+        fun settingKeyToButtonCode(key: String): Int? = when (key) {
+            Settings.KEY_BUTTON_A -> NativeLibrary.ButtonType.BUTTON_A
+            Settings.KEY_BUTTON_B -> NativeLibrary.ButtonType.BUTTON_B
+            Settings.KEY_BUTTON_X -> NativeLibrary.ButtonType.BUTTON_X
+            Settings.KEY_BUTTON_Y -> NativeLibrary.ButtonType.BUTTON_Y
+            Settings.KEY_BUTTON_L -> NativeLibrary.ButtonType.TRIGGER_L
+            Settings.KEY_BUTTON_R -> NativeLibrary.ButtonType.TRIGGER_R
+            Settings.KEY_BUTTON_ZL -> NativeLibrary.ButtonType.BUTTON_ZL
+            Settings.KEY_BUTTON_ZR -> NativeLibrary.ButtonType.BUTTON_ZR
+            Settings.KEY_BUTTON_SELECT -> NativeLibrary.ButtonType.BUTTON_SELECT
+            Settings.KEY_BUTTON_START -> NativeLibrary.ButtonType.BUTTON_START
+            Settings.KEY_BUTTON_HOME -> NativeLibrary.ButtonType.BUTTON_HOME
+            Settings.KEY_BUTTON_UP -> NativeLibrary.ButtonType.DPAD_UP
+            Settings.KEY_BUTTON_DOWN -> NativeLibrary.ButtonType.DPAD_DOWN
+            Settings.KEY_BUTTON_LEFT -> NativeLibrary.ButtonType.DPAD_LEFT
+            Settings.KEY_BUTTON_RIGHT -> NativeLibrary.ButtonType.DPAD_RIGHT
+            Settings.HOTKEY_SCREEN_SWAP -> Hotkey.SWAP_SCREEN.button
+            Settings.HOTKEY_CYCLE_LAYOUT -> Hotkey.CYCLE_LAYOUT.button
+            Settings.HOTKEY_CLOSE_GAME -> Hotkey.CLOSE_GAME.button
+            Settings.HOTKEY_PAUSE_OR_RESUME -> Hotkey.PAUSE_OR_RESUME.button
+            Settings.HOTKEY_QUICKSAVE -> Hotkey.QUICKSAVE.button
+            Settings.HOTKEY_QUICKlOAD -> Hotkey.QUICKLOAD.button
+            Settings.HOTKEY_TURBO_LIMIT -> Hotkey.TURBO_LIMIT.button
+            else -> null
         }
     }
 }
